@@ -171,7 +171,7 @@
     //========自定义填充移除
     // 移除填充
     int data_len = (int)c_obj_len;
-    for (int i = c_obj_len-1; i > 0; i--) {
+    for (int i = (int)c_obj_len-1; i > 0; i--) {
         if (result[i] == 0x00 || result[i] == 0x80) {
             continue;
         }
@@ -328,7 +328,7 @@
     //========自定义填充移除
     // 移除填充
     int data_len = (int)c_obj_len;
-    for (int i = c_obj_len-1; i > 0; i--) {
+    for (int i = (int)c_obj_len-1; i > 0; i--) {
         if (result[i] == 0x00 || result[i] == 0x80) {
             continue;
         }
