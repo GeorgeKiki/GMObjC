@@ -63,13 +63,36 @@
     uint8_t *plain_obj = (uint8_t *)plainData.bytes;
     size_t plain_obj_len = plainData.length;
     
+    
+    // 计算填充长度
+//    int pad_en = SM4_BLOCK_SIZE - plain_obj_len % SM4_BLOCK_SIZE;
+//    size_t result_len = plain_obj_len + pad_en;
+//    // 填充
+//    uint8_t *p_text = (uint8_t *)OPENSSL_zalloc((int)(result_len + 1));
+//    memcpy(p_text, plain_obj, plain_obj_len);
+//    for (int i = 0; i < pad_en; i++) {
+//        p_text[plain_obj_len + i] = pad_en;
+//    }
+    
+    //=============自定义padding规则
     // 计算填充长度
     int pad_en = SM4_BLOCK_SIZE - plain_obj_len % SM4_BLOCK_SIZE;
+    pad_en = pad_en + (16-pad_en)*16;
+
     size_t result_len = plain_obj_len + pad_en;
-    // PKCS7 填充
+    // 填充
     uint8_t *p_text = (uint8_t *)OPENSSL_zalloc((int)(result_len + 1));
     memcpy(p_text, plain_obj, plain_obj_len);
-    memset(p_text + plain_obj_len, pad_en, pad_en);
+    for (int i = 0; i < pad_en; i++) {
+        if (i == 0) {
+            p_text[plain_obj_len] = 0x80;
+        }
+        else {
+            p_text[plain_obj_len + i] = 0x00;
+        }
+    }
+    //================
+    
     
     uint8_t *result = (uint8_t *)OPENSSL_zalloc((int)(result_len + 1));
     int group_num = (int)(result_len / SM4_BLOCK_SIZE);
@@ -132,10 +155,40 @@
         SM4_decrypt(block, block, &sm4Key);
         memcpy(result + i * SM4_BLOCK_SIZE, block, SM4_BLOCK_SIZE);
     }
+    
     // 移除填充
-    int pad_len = (int)result[c_obj_len - 1];
-    int end_len = (int)(c_obj_len - pad_len);
-    NSData *plainData = [NSData dataWithBytes:result length:end_len];
+//    int pad_len = (int)result[c_obj_len - 1];
+//    int end_len = (int)(c_obj_len - pad_len);
+    //    NSData *plainData = nil;
+    //    if (pad_len > 0 && pad_len < SM4_BLOCK_SIZE + 1) {
+    //        uint8_t *no_pad_result = (uint8_t *)OPENSSL_zalloc((int)(end_len + 1));
+    //        memcpy(no_pad_result, result, end_len);
+    //        plainData = [NSData dataWithBytes:no_pad_result length:end_len];
+    //
+    //        OPENSSL_free(no_pad_result);
+    //    }
+    
+    //========自定义填充移除
+    // 移除填充
+    int data_len = (int)c_obj_len;
+    for (int i = c_obj_len-1; i > 0; i--) {
+        if (result[i] == 0x00 || result[i] == 0x80) {
+            continue;
+        }
+        else {
+            data_len = i+1;
+            break;
+        }
+    }
+    NSData *plainData = nil;
+    if (data_len > 0) {
+        uint8_t *no_pad_result = (uint8_t *)OPENSSL_zalloc((int)(data_len));
+        memcpy(no_pad_result, result, data_len);
+        plainData = [NSData dataWithBytes:no_pad_result length:data_len];
+        
+        OPENSSL_free(no_pad_result);
+    }
+    //===========
     
     OPENSSL_free(result);
     
@@ -162,15 +215,38 @@
     }
     
     // 明文
-    uint8_t *p_obj = (uint8_t *)plainData.bytes;
-    size_t p_obj_len = plainData.length;
+    uint8_t *plain_obj = (uint8_t *)plainData.bytes;
+    size_t plain_obj_len = plainData.length;
     
-    int pad_len = SM4_BLOCK_SIZE - p_obj_len % SM4_BLOCK_SIZE;
-    size_t result_len = p_obj_len + pad_len;
-    // PKCS7 填充
+
+    //计算填充长度
+//    int pad_len = SM4_BLOCK_SIZE - plain_obj_len % SM4_BLOCK_SIZE;
+//    size_t result_len = plain_obj + pad_len;
+//    // PKCS7 填充
+//    uint8_t *p_text = (uint8_t *)OPENSSL_zalloc((int)(result_len + 1));
+//    memcpy(p_text, p_obj, p_obj_len);
+//    for (int i = 0; i < pad_len; i++) {
+//        p_text[plain_obj_len + i] = pad_len;
+//    }
+    
+    //=============自定义padding规则
+    // 计算填充长度
+    int pad_len = SM4_BLOCK_SIZE - plain_obj_len % SM4_BLOCK_SIZE;
+    pad_len = pad_len + (16-pad_len)*16;
+
+    size_t result_len = plain_obj_len + pad_len;
+    // 填充
     uint8_t *p_text = (uint8_t *)OPENSSL_zalloc((int)(result_len + 1));
-    memcpy(p_text, p_obj, p_obj_len);
-    memset(p_text + p_obj_len, pad_len, pad_len);
+    memcpy(p_text, plain_obj, plain_obj_len);
+    for (int i = 0; i < pad_len; i++) {
+        if (i == 0) {
+            p_text[plain_obj_len] = 0x80;
+        }
+        else {
+            p_text[plain_obj_len + i] = 0x00;
+        }
+    }
+    //================
     
     uint8_t *result = (uint8_t *)OPENSSL_zalloc((int)(result_len + 1));
     // 密钥 key Hex 转 uint8_t
@@ -235,11 +311,42 @@
     // CBC 解密
     CRYPTO_cbc128_decrypt(c_obj, result, c_obj_len, &sm4Key, ivec_block,
                           (block128_f)SM4_decrypt);
+
     // 移除填充
-    int pad_len = (int)result[c_obj_len - 1];
-    int end_len = (int)(c_obj_len - pad_len);
-    NSData *plainData = [NSData dataWithBytes:result length:end_len];
+//    int pad_len = (int)result[c_obj_len - 1];
+//    int end_len = (int)(c_obj_len - pad_len);
+//
+//    NSData *plainData = nil;
+//    if (pad_len > 0 && pad_len < SM4_BLOCK_SIZE + 1) {
+//        uint8_t *no_pad_result = (uint8_t *)OPENSSL_zalloc((int)(end_len + 1));
+//        memcpy(no_pad_result, result, end_len);
+//        plainData = [NSData dataWithBytes:no_pad_result length:end_len];
+//
+//        OPENSSL_free(no_pad_result);
+//    }
     
+    //========自定义填充移除
+    // 移除填充
+    int data_len = (int)c_obj_len;
+    for (int i = c_obj_len-1; i > 0; i--) {
+        if (result[i] == 0x00 || result[i] == 0x80) {
+            continue;
+        }
+        else {
+            data_len = i+1;
+            break;
+        }
+    }
+    NSData *plainData = nil;
+    if (data_len > 0) {
+        uint8_t *no_pad_result = (uint8_t *)OPENSSL_zalloc((int)(data_len));
+        memcpy(no_pad_result, result, data_len);
+        plainData = [NSData dataWithBytes:no_pad_result length:data_len];
+        
+        OPENSSL_free(no_pad_result);
+    }
+    //===========
+
     OPENSSL_free(result);
     
     return plainData;
